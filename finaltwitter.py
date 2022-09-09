@@ -10,13 +10,15 @@ Original file is located at
 import pandas as pd
 
 data=pd.read_csv('train.tsv', lineterminator='\n',error_bad_lines=False, sep = '\t',header= None)
-data
+#new testset
+data_test = pd.read_csv('test.tsv', lineterminator='\n',error_bad_lines=False, sep = '\t',header= None)
 
 data.drop_duplicates(inplace = True)
 
 data['text'] = data[1]
 data['sentiment'] = data[0]
-data
+data_test['text'] = data_test[1]
+data_test['sentiment'] = data_test[0]
 
 import seaborn as sns
 sns.countplot(data['sentiment'])
@@ -39,7 +41,7 @@ def remove_user(tweet,pattern):
 
 # removing @USER from all tweets
 data['tweet without user'] = np.vectorize(remove_user)(data['text'],"@[\w]*")
-data.head()
+data_test['tweet without user'] = np.vectorize(remove_user)(data_test['text'],"@[\w]*")
 
 pip install emot
 
@@ -58,12 +60,12 @@ def convert_emojis(text):
 
 data['tweet without user and emojis'] = data['tweet without user'].apply(convert_emojis)
 
-data
+data_test['tweet without user and emojis'] = data_test['tweet without user'].apply(convert_emojis)
 
 #removing all special charectors from all tweets
 
 data['tweet without user,emo,spec char'] = data['tweet without user and emojis'].str.replace('^A-Za-z1-9#',' ')
-data
+data_test['tweet without user,emo,spec char'] = data_test['tweet without user and emojis'].str.replace('^A-Za-z1-9#',' ')
 
 
 
@@ -78,7 +80,7 @@ def remove_punc(test):
   return test_join
 
 data['tweet without user,emo,spec char,punc'] = data['tweet without user,emo,spec char'].apply(remove_punc)
-data
+data_test['tweet without user,emo,spec char,punc'] = data_test['tweet without user,emo,spec char'].apply(remove_punc)
 
 vocab = remove_punc(data['tweet without user,emo,spec char,punc'])
 
@@ -254,6 +256,18 @@ print(roc_auc_score(y_test_cv,pred))
 from sklearn.metrics import classification_report
 classification_report(y_test_cv,pred)
 
+### testing on new test set
+
+count = CountVectorizer(max_features=1500)
+input_text_test = count.fit_transform(data_test['tweet without user,emo,spec char,punc'])
+sentiment_test = data_test['sentiment']
+test_pred = svc_classifier.predict(input_text_test)
+print(roc_auc_score(sentiment_test,test_pred))
+
+from sklearn.metrics import classification_report
+classification_report(y_test_cv,pred)
+print(classification_report(sentiment_test,test_pred))
+
 ### For LSTM  implementaion we have taken references from a udemy course
 ### citation: https://www.udemy.com/course/ml-and-python-in-finance-real-cases-and-practical-solutions/
 
@@ -307,6 +321,13 @@ train_sequence = tokenizer.texts_to_sequences(x_train)
 
 test_sequence = tokenizer.texts_to_sequences(x_test)
 
+#tokenizing all tweets on new test set
+
+x = data_test['tweet without user,emo,spec char,punc']
+y = data_test['sentiment']
+tokenizer.fit_on_texts(x)
+test_seq = tokenizer.texts_to_sequences(x)
+
 # As there are only 32 tweets are above length of 35 strings,so we are truncating all tweets upto 35 
 
 ### truncating train data
@@ -321,17 +342,25 @@ trunc_test_sequence = []
 for i in test_sequence:
   trunc = i[0:35]
   trunc_test_sequence.append(trunc)
+    
+#trunacating all tweets in new test set
+trunc_test_seq = []
+for i in test_seq:
+  trunca = i[0:35]
+  trunc_test_seq.append(trunca)    
 
 ### As the neural networks accepts only same size of input, so we are padding all train and test sequences to length 35
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 padded_train = pad_sequences(trunc_train_sequence,maxlen=35, padding = 'post')
 padded_test = pad_sequences(trunc_test_sequence,maxlen=35,padding = 'post')
+padded_test_new = pad_sequences(trunc_test_seq,maxlen=35,padding = 'post')
 
 #converting sentiment to categorical value
 
 y_train_cat = to_categorical(y_train,2)
 y_test_cat = to_categorical(y_test,2)
+y_test_new = to_categorical(y,2)
 
 #LSTM model using keras library
 
@@ -362,4 +391,16 @@ for i in y_test_cat:
 from sklearn.metrics import accuracy_score
 accuracy = accuracy_score(original,predictions)
 accuracy
+
+### testing LSTM on new test set
+pred_test = model.predict(padded_test_new)
+predict = []
+for i in pred_test:
+  predict.append(np.argmax(i))
+
+original_test = []
+for i in y_test_new:
+  original_test.append(np.argmax(i))
+
+
 
