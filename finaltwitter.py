@@ -402,5 +402,6 @@ original_test = []
 for i in y_test_new:
   original_test.append(np.argmax(i))
 
-
+accuracy_test = accuracy_score(original_test,predict)
+accuracy_test
 
